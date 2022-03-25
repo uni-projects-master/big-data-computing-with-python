@@ -36,7 +36,7 @@ def gather_pairs_partitions(pairs):
 			pairs_dict[word] += occurrences
 	return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
-def word_count_1(docs):
+def productCustomer(docs):
 	word_count = (docs.flatMap(word_count_per_doc) # <-- MAP PHASE (R1)
 				 .reduceByKey(lambda x, y: x + y)) # <-- REDUCE PHASE (R1)
 	return word_count
@@ -66,10 +66,10 @@ def word_count_with_partition(docs):
 def main():
 
 	# CHECKING NUMBER OF CMD LINE PARAMTERS
-	assert len(sys.argv) == 3, "Usage: python WordCountExample.py <K> <file_name>"
+	assert len(sys.argv) == 5, "Usage: python WordCountExample.py <K> <H> <S> <file_name>"
 
 	# SPARK SETUP
-	conf = SparkConf().setAppName('WordCountExample').setMaster("local[*]")
+	conf = SparkConf().setAppName('ProductPopolarityExample').setMaster("local[*]")
 	sc = SparkContext(conf=conf)
 
 	# INPUT READING
@@ -79,15 +79,22 @@ def main():
 	assert K.isdigit(), "K must be an integer"
 	K = int(K)
 
+	H = sys.argv[2]
+	assert H.isdigit(), "H must be an integer"
+	H = int(H)
+
+	S = sys.argv[3]
+	S = str(S)
+
 	# 2. Read input file and subdivide it into K random partitions
-	data_path = sys.argv[2]
+	data_path = sys.argv[4]
 	assert os.path.isfile(data_path), "File or folder not found"
-	docs = sc.textFile(data_path,minPartitions=K).cache()
-	docs.repartition(numPartitions=K)
+	dataset = sc.textFile(data_path,minPartitions=K).cache()
+	dataset.repartition(numPartitions=K)
 
 	# SETTING GLOBAL VARIABLES
-	numdocs = docs.count();
-	print("Number of documents = ", numdocs)
+	num_of_partitions = dataset.count();
+	print("Number of documents = ", num_of_partitions)
 
 	# STANDARD WORD COUNT with reduceByKey
 	print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
