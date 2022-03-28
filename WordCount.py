@@ -4,21 +4,6 @@ import os
 import random as rand
 
 
-def format_and_filter_doc(document, K=-1):
-    product_costumer_set = set()
-    for line in document.split('\n'):
-        fields = document.split('\n')
-        product = fields[1]
-        count = fields[3]
-        costumer = fields[6]
-        country = fields[7]
-        if (count > 0 and (country == S or country == "all") and ((product,costumer) not in product_costumer_set[product])):
-            product_costumer_set.add((product,costumer))
-    if K == -1:
-        return [(p, c) for p,c in product_costumer_set]
-    else:
-        return [(rand.randint(0, K - 1), (p, c)) for p,c in product_costumer_set]
-
 def word_count_per_doc(document, K=-1):
     pairs_dict = {}
     for word in document.split(' '):
@@ -54,10 +39,6 @@ def gather_pairs_partitions(pairs):
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
 
-def filter(dataset):
-    test = (docs.flatMap(word_count_per_doc))
-    return test
-
 def word_count_1(docs):
     word_count = (docs.flatMap(word_count_per_doc)  # <-- MAP PHASE (R1)
                   .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R1)
@@ -90,8 +71,8 @@ def word_count_with_partition(docs):
 
 
 def main():
-    # CHECKING NUMBER OF CMD LINE PARAMETERS
-    assert len(sys.argv) == 5, "Usage: python G042HW1.py <K> <H> <S> <file_name>"
+    # CHECKING NUMBER OF CMD LINE PARAMTERS
+    assert len(sys.argv) == 3, "Usage: python WordCountExample.py <K> <file_name>"
 
     # SPARK SETUP
     conf = SparkConf().setAppName('WordCountExample').setMaster("local[*]")
@@ -104,28 +85,16 @@ def main():
     assert K.isdigit(), "K must be an integer"
     K = int(K)
 
-    # 2. Read H
-    H = sys.argv[2]
-    assert H.isdigit(), "H must be an integer"
-    H = int(H)
-
-    # 3. Read S
-    S = sys.argv[3]
-
-    # 4. Read input file and subdivide it into K random partitions
-    data_path = sys.argv[4]
+    # 2. Read input file and subdivide it into K random partitions
+    data_path = sys.argv[2]
     assert os.path.isfile(data_path), "File or folder not found"
-
-    dataset = sc.textFile(data_path, minPartitions=K).cache()
-    dataset.repartition(numPartitions=K)
+    docs = sc.textFile(data_path, minPartitions=K).cache()
+    docs.repartition(numPartitions=K)
 
     # SETTING GLOBAL VARIABLES
-    numdocs = dataset.count();
+    numdocs = docs.count();
     print("Number of documents = ", numdocs)
 
-    print("Number of distinct words in the documents using reduceByKey =", filter(dataset[0],S,K).groupByKey().mapValues(lambda x: (x,1)))
-
-'''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
 
@@ -143,7 +112,7 @@ def main():
     # COMPUTE AVERAGE WORD LENGTH
     average_word_len = wordcount.keys().map(lambda x: len(x)).reduce(lambda x, y: x + y)
     print("Average word length = ", average_word_len / numwords)
-'''
+
 
 if __name__ == "__main__":
     main()
