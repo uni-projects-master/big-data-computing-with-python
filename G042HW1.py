@@ -6,18 +6,25 @@ import random as rand
 
 def format_and_filter_doc(document, S, K=1):
     product_costumer = {}
+    #reading input
     for line in document.split('\n'):
         fields = document.split(',')
         product = fields[1]
         count = int(fields[3])
         costumer = fields[6]
         country = fields[7]
-        if (count > 0 and (country == S or country == "all")):
-            if(costumer not in product_costumer[product]):
+        # checking for positive quantity
+        # do we need to check country here?
+        if count > 0 and (country == S or country == "all"):
+            if costumer not in product_costumer[product]:
+                # using set to keep distinct pairs of product_customer
                 product_costumer[product] = set()
             product_costumer[product].add(costumer)
+    #Partisioning into K subsets randomly
+    #what is keys in product_customer?
     return [(rand.randint(0, K - 1), (p, product_costumer[p])) for p in product_costumer.keys()]
 
+#checking to see if the product_customer pair is distinct
 def gather_pairs(pairs):
     pairs_set = set()
     for p in pairs[1]:
@@ -26,6 +33,7 @@ def gather_pairs(pairs):
         if (product, costumer) not in pairs_set:
             pairs_set.add((product, costumer))
     return [(0,(p, c)) for (p, c) in pairs_set]
+
 
 def filter(dataset,K,S):
     filtered_dataset = dataset\
@@ -68,7 +76,7 @@ def main():
     dataset.repartition(numPartitions=K)
     print(K)
     # SETTING GLOBAL VARIABLES
-    numdocs = dataset.count();
+    numdocs = dataset.count()
     print("Number of documents = ", numdocs)
 
     print("filtered stuff =", filter(dataset,K,S))
