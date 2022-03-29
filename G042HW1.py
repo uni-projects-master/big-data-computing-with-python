@@ -4,89 +4,37 @@ import os
 import random as rand
 
 
-def format_and_filter_doc(document, K=-1):
-    product_costumer_set = set()
+def format_and_filter_doc(document, S, K=1):
+    product_costumer = {}
     for line in document.split('\n'):
-        fields = document.split('\n')
+        fields = document.split(',')
         product = fields[1]
-        count = fields[3]
+        count = int(fields[3])
         costumer = fields[6]
         country = fields[7]
-        if (count > 0 and (country == S or country == "all") and ((product,costumer) not in product_costumer_set[product])):
-            product_costumer_set.add((product,costumer))
-    if K == -1:
-        return [(p, c) for p,c in product_costumer_set]
-    else:
-        return [(rand.randint(0, K - 1), (p, c)) for p,c in product_costumer_set]
-
-def word_count_per_doc(document, K=-1):
-    pairs_dict = {}
-    for word in document.split(' '):
-        if word not in pairs_dict.keys():
-            pairs_dict[word] = 1
-        else:
-            pairs_dict[word] += 1
-    if K == -1:
-        return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
-    else:
-        return [(rand.randint(0, K - 1), (key, pairs_dict[key])) for key in pairs_dict.keys()]
-
+        if (count > 0 and (country == S or country == "all")):
+            if(costumer not in product_costumer[product]):
+                product_costumer[product] = set()
+            product_costumer[product].add(costumer)
+    return [(rand.randint(0, K - 1), (p, product_costumer[p])) for p in product_costumer.keys()]
 
 def gather_pairs(pairs):
-    pairs_dict = {}
+    pairs_set = set()
     for p in pairs[1]:
-        word, occurrences = p[0], p[1]
-        if word not in pairs_dict.keys():
-            pairs_dict[word] = occurrences
-        else:
-            pairs_dict[word] += occurrences
-    return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
+        product = p[0]
+        costumer = p[1]
+        if (product, costumer) not in pairs_set:
+            pairs_set.add((product, costumer))
+    return [(0,(p, c)) for (p, c) in pairs_set]
 
-
-def gather_pairs_partitions(pairs):
-    pairs_dict = {}
-    for p in pairs:
-        word, occurrences = p[0], p[1]
-        if word not in pairs_dict.keys():
-            pairs_dict[word] = occurrences
-        else:
-            pairs_dict[word] += occurrences
-    return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
-
-
-def filter(dataset):
-    test = (docs.flatMap(word_count_per_doc))
-    return test
-
-def word_count_1(docs):
-    word_count = (docs.flatMap(word_count_per_doc)  # <-- MAP PHASE (R1)
-                  .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R1)
-    return word_count
-
-
-def word_count_2(docs, K):
-    word_count = (docs.flatMap(lambda x: word_count_per_doc(x, K))  # <-- MAP PHASE (R1)
-                  .groupByKey()  # <-- SHUFFLE+GROUPING
-                  .flatMap(gather_pairs)  # <-- REDUCE PHASE (R1)
-                  .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R2)
-    return word_count
-
-
-def word_count_3(docs, K):
-    word_count = (docs.flatMap(word_count_per_doc)  # <-- MAP PHASE (R1)
-                  .groupBy(lambda x: (rand.randint(0, K - 1)))  # <-- SHUFFLE+GROUPING
-                  .flatMap(gather_pairs)  # <-- REDUCE PHASE (R1)
-                  .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R2)
-    return word_count
-
-
-def word_count_with_partition(docs):
-    word_count = (docs.flatMap(word_count_per_doc)  # <-- MAP PHASE (R1)
-                  .mapPartitions(gather_pairs_partitions)  # <-- REDUCE PHASE (R1)
-                  .groupByKey()  # <-- SHUFFLE+GROUPING
-                  .mapValues(lambda vals: sum(vals)))  # <-- REDUCE PHASE (R2)
-
-    return word_count
+def filter(dataset,K,S):
+    filtered_dataset = dataset\
+        .flatMap(lambda x: format_and_filter_doc(x, S, K))\
+        .groupByKey()\
+        .flatMap(gather_pairs)\
+        .map(lambda (p,c))\
+        .collect()
+    return filtered_dataset
 
 
 def main():
@@ -118,13 +66,12 @@ def main():
 
     dataset = sc.textFile(data_path, minPartitions=K).cache()
     dataset.repartition(numPartitions=K)
-
+    print(K)
     # SETTING GLOBAL VARIABLES
     numdocs = dataset.count();
     print("Number of documents = ", numdocs)
 
-    print("Number of distinct words in the documents using reduceByKey =", filter(dataset[0],S,K).groupByKey().mapValues(lambda x: (x,1)))
-
+    print("filtered stuff =", filter(dataset,K,S))
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
