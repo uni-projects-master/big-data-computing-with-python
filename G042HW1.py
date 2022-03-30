@@ -3,9 +3,8 @@ import sys
 import os
 import random as rand
 
-
-def format_and_filter_doc(document, S, K=1):
-    product_costumer = {}
+def format_and_filter_dataset(document, S, K=1):
+    product_costumer = set()
     for line in document.split('\n'):
         fields = document.split(',')
         product = fields[1]
@@ -13,26 +12,18 @@ def format_and_filter_doc(document, S, K=1):
         costumer = fields[6]
         country = fields[7]
         if (count > 0 and (country == S or country == "all")):
-            if(costumer not in product_costumer[product]):
-                product_costumer[product] = set()
-            product_costumer[product].add(costumer)
-    return [(rand.randint(0, K - 1), (p, product_costumer[p])) for p in product_costumer.keys()]
+            if((product,costumer) not in product_costumer):
+                product_costumer.add((product,costumer))
+    return [((product,costumer),0) for (product,costumer) in product_costumer]
 
-def gather_pairs(pairs):
-    pairs_set = set()
-    for p in pairs[1]:
-        product = p[0]
-        costumer = p[1]
-        if (product, costumer) not in pairs_set:
-            pairs_set.add((product, costumer))
-    return [(0,(p, c)) for (p, c) in pairs_set]
+def remove_copies(pairs):
+    return pairs[0]
 
 def filter(dataset,K,S):
     filtered_dataset = dataset\
-        .flatMap(lambda x: format_and_filter_doc(x, S, K))\
+        .flatMap(lambda x: format_and_filter_dataset(x, S, K))\
         .groupByKey()\
-        .flatMap(gather_pairs)\
-        .map(lambda (p,c))\
+        .flatMap(remove_copies)\
         .collect()
     return filtered_dataset
 
@@ -66,7 +57,6 @@ def main():
 
     dataset = sc.textFile(data_path, minPartitions=K).cache()
     dataset.repartition(numPartitions=K)
-    print(K)
     # SETTING GLOBAL VARIABLES
     numdocs = dataset.count();
     print("Number of documents = ", numdocs)
