@@ -52,9 +52,10 @@ def popularity1(product_costumer, K=1):
 def random_partition(product_costumer_pair, K):
     return (rand.randint(0, K - 1), product_costumer_pair[0])
 
-def partial_count_2(product_list):
+def partial_count_2(index_product_pair):
     product_count2 = {}
-    for (index,product) in product_list:
+    product_list = index_product_pair[1]
+    for product in product_list:
         if product not in product_count2.keys():
             product_count2[product] = 1
         else:
