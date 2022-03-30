@@ -50,24 +50,24 @@ def popularity1(product_costumer, K=1):
     return product_popularity1
 
 def random_partition(product_costumer_pair, K):
-    return ((rand.randint(0, K - 1), product_costumer_pair[0]))
+    return (rand.randint(0, K - 1), product_costumer_pair[0])
 
 def partial_count_2(product_list):
-    product_count = {}
+    product_count2 = {}
     for (index,product) in product_list:
-        if product not in product_count.keys():
-            product_count[product] = 1
+        if product not in product_count2.keys():
+            product_count2[product] = 1
         else:
-            product_count[product] += 1
+            product_count2[product] += 1
 
-    return [(product, product_count[product]) for product in product_count.keys()]
+    return [(product, product_count2[product]) for product in product_count2.keys()]
 
 def popularity2(product_costumer, K=1):
     product_popularity2 = product_costumer\
-        .map(lambda x: random_partition(x,K)\
+        .map(lambda x : random_partition(x,K))\
         .groupByKey()\
-        .map(partial_count)\
-        .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R2)
+        .flatMap(partial_count_2)\
+        .reduceByKey(lambda x, y: x + y)  # <-- REDUCE PHASE (R2)
     return product_popularity2
 
 def main():
@@ -108,7 +108,7 @@ def main():
     product_popularity1 = popularity1(filteredRDD)
     print("product popularity =", product_popularity1.collect())
     product_popularity2 = popularity2(filteredRDD)
-    print("product popularity =", product_popularity2.collect())
+    print("product popularity2 =", product_popularity2.collect())
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
