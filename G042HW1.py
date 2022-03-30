@@ -4,25 +4,22 @@ import sys
 import os
 import random as rand
 
-
-def predicate(document, S, K=1):
-    product_costumer = set()
-    for line in document.split('\n'):
-        fields = document.split(',')
+def format_and_filter_dataset_list(dataset, S, K=1):
+    product_costumer = []
+    for string in dataset:
+        fields = string.split(',')
         product = fields[1]
         count = int(fields[3])
         costumer = fields[6]
         country = fields[7]
-        if (count > 0 and (country == S or country == "all")):
-            if((product,costumer) not in product_costumer):
-                product_costumer.add((product,costumer))
-    return [((product,costumer),0) for (product,costumer) in product_costumer]
-
+        if (count > 0 and (country == S or S == "all")):
+            product_costumer.append(((product,costumer),0))
+    return product_costumer
 
 def format_and_filter_dataset(dataset, S, K=1):
     product_costumer = set()
-    for line in dataset.split('\n'):
-        fields = dataset.split(',')
+    for string in dataset:
+        fields = string.split(',')
         product = fields[1]
         count = int(fields[3])
         costumer = fields[6]
@@ -36,9 +33,9 @@ def remove_copies(pairs):
 
 def filter(dataset,K,S):
     filtered_dataset = dataset\
-        .flatMap(lambda x: format_and_filter_dataset(x, S, K))\
+        .mapPartitions(lambda x: format_and_filter_dataset(x, S, K))\
         .groupByKey()\
-        .map(remove_copies).collect()
+        .keys().collect()
     return filtered_dataset
 
 
@@ -73,9 +70,8 @@ def main():
     rawData = sc.textFile(data_path, minPartitions=K).cache()
     rawData.repartition(numPartitions=K)
     # SETTING GLOBAL VARIABLES
-    numdocs = rawData.count();
+    numdocs = rawData.getNumPartitions();
     print("Number of documents = ", numdocs)
-
     print("filtered stuff =", filter(rawData,K,S))
 '''
     # STANDARD WORD COUNT with reduceByKey
