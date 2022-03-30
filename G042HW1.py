@@ -71,6 +71,27 @@ def popularity2(product_costumer, K=1):
         .reduceByKey(lambda x, y: x + y)  # <-- REDUCE PHASE (R2)
     return product_popularity2
 
+def extract_top_H(partition,H):
+    top_H_pairs = set()
+    for i in range(max(H, len(partition))):
+        temp_n = 0
+        temp_p = None
+        for (n,p) in partition:
+            if ((n,p) not in top_H_pairs) and n > temp_n:
+                temp_n = n
+                temp_p = p
+        top_H_pairs.add((temp_n,temp_p))
+    return [(n,p) for (n,p) in top_H_pairs]
+
+def topH(product_popularity, H, K=1):
+    top_H_product = product_popularity\
+        .map(lambda (p,n): (n,p))\
+        .repartition(numPartitions=K)\
+        .mapPartitions(lambda x: extract_top_H(x,H))
+        .repartition(numPartitions=1)
+        .map(lambda x: extract_top_H(x, H))
+    return product_popularity2
+
 def main():
     # CHECKING NUMBER OF CMD LINE PARAMETERS
     assert len(sys.argv) == 5, "Usage: python G042HW1.py <K> <H> <S> <file_name>"
@@ -106,10 +127,11 @@ def main():
     print("Number of documents = ", numdocs)
     filteredRDD = filter(rawData,K,S)
     print("filtered stuff =", filteredRDD.collect())
-    product_popularity1 = popularity1(filteredRDD)
+    product_popularity1 = popularity1(filteredRDD,K)
     print("product popularity =", product_popularity1.collect())
-    product_popularity2 = popularity2(filteredRDD)
+    product_popularity2 = popularity2(filteredRDD,K)
     print("product popularity2 =", product_popularity2.collect())
+    topH(product_popularity1,H,K)
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
