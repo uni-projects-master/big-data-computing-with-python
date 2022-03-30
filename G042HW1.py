@@ -4,18 +4,6 @@ import sys
 import os
 import random as rand
 
-def format_and_filter_dataset_list(dataset, S, K=1):
-    product_costumer = []
-    for string in dataset:
-        fields = string.split(',')
-        product = fields[1]
-        count = int(fields[3])
-        costumer = fields[6]
-        country = fields[7]
-        if (count > 0 and (country == S or S == "all")):
-            product_costumer.append(((product,costumer),0))
-    return product_costumer
-
 def format_and_filter_dataset(dataset, S, K=1):
     product_costumer = set()
     for string in dataset:
@@ -35,8 +23,31 @@ def filter(dataset,K,S):
     filtered_dataset = dataset\
         .mapPartitions(lambda x: format_and_filter_dataset(x, S, K))\
         .groupByKey()\
-        .keys().collect()
+        .keys()
     return filtered_dataset
+
+def partial_count(dataset):
+    product_count = {}
+    for (product, costumer) in dataset:
+        if product not in product_count.keys():
+            product_count[product] = 1
+        else:
+            product_count[product] += 1
+
+    return [(product,product_count[product]) for product in product_count.keys()]
+
+def full_count(pair):
+    product = pair[0]
+    count_list = pair[1]
+    return (product, sum(count_list))
+
+def popularity1(product_costumer, K=1):
+    product_popularity1 = product_costumer\
+        .repartition(numPartitions=K)\
+        .mapPartitions(partial_count)\
+        .groupByKey()\
+        .mapValues(lambda partial_counts: sum(partial_counts))
+    return product_popularity1
 
 
 def main():
@@ -44,7 +55,7 @@ def main():
     assert len(sys.argv) == 5, "Usage: python G042HW1.py <K> <H> <S> <file_name>"
 
     # SPARK SETUP
-    conf = SparkConf().setAppName('WordCountExample').setMaster("local[*]")
+    conf = SparkConf().setAppName('HomeWork1').setMaster("local[*]")
     sc = SparkContext(conf=conf)
 
     # INPUT READING
@@ -72,7 +83,11 @@ def main():
     # SETTING GLOBAL VARIABLES
     numdocs = rawData.getNumPartitions();
     print("Number of documents = ", numdocs)
-    print("filtered stuff =", filter(rawData,K,S))
+    filteredRDD = filter(rawData,K,S)
+    print("filtered stuff =", filteredRDD.collect())
+    product_popularity1 = popularity1(filteredRDD)
+    print("product popularity =", product_popularity1.collect())
+
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
