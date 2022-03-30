@@ -1,9 +1,11 @@
 from pyspark import SparkContext, SparkConf
+from pyspark.sql import DataFrameReader
 import sys
 import os
 import random as rand
 
-def format_and_filter_dataset(document, S, K=1):
+
+def predicate(document, S, K=1):
     product_costumer = set()
     for line in document.split('\n'):
         fields = document.split(',')
@@ -16,15 +18,27 @@ def format_and_filter_dataset(document, S, K=1):
                 product_costumer.add((product,costumer))
     return [((product,costumer),0) for (product,costumer) in product_costumer]
 
+
+def format_and_filter_dataset(dataset, S, K=1):
+    product_costumer = set()
+    for line in dataset.split('\n'):
+        fields = dataset.split(',')
+        product = fields[1]
+        count = int(fields[3])
+        costumer = fields[6]
+        country = fields[7]
+        if (count > 0 and (country == S or S == "all")):
+            product_costumer.add((product,costumer))
+    return [((product,costumer),0) for (product,costumer) in product_costumer]
+
 def remove_copies(pairs):
-    return pairs[0]
+    return (pairs[0][0],pairs[0][1])
 
 def filter(dataset,K,S):
     filtered_dataset = dataset\
         .flatMap(lambda x: format_and_filter_dataset(x, S, K))\
         .groupByKey()\
-        .flatMap(remove_copies)\
-        .collect()
+        .map(remove_copies).collect()
     return filtered_dataset
 
 
@@ -54,14 +68,15 @@ def main():
     # 4. Read input file and subdivide it into K random partitions
     data_path = sys.argv[4]
     assert os.path.isfile(data_path), "File or folder not found"
+    #rawData = DataFrameReader.csv(DataFrameReader,data_path)
 
-    dataset = sc.textFile(data_path, minPartitions=K).cache()
-    dataset.repartition(numPartitions=K)
+    rawData = sc.textFile(data_path, minPartitions=K).cache()
+    rawData.repartition(numPartitions=K)
     # SETTING GLOBAL VARIABLES
-    numdocs = dataset.count();
+    numdocs = rawData.count();
     print("Number of documents = ", numdocs)
 
-    print("filtered stuff =", filter(dataset,K,S))
+    print("filtered stuff =", filter(rawData,K,S))
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
