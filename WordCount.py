@@ -57,7 +57,7 @@ def word_count_3(docs, K):
     word_count = (docs.flatMap(word_count_per_doc)  # <-- MAP PHASE (R1)
                   .groupBy(lambda x: (rand.randint(0, K - 1)))  # <-- SHUFFLE+GROUPING
                   .flatMap(gather_pairs)  # <-- REDUCE PHASE (R1)
-                  .reduceByKey(lambda x, y: x + y))  # <-- REDUCE PHASE (R2)
+                  .reduce(lambda x, y: x + y))  # <-- REDUCE PHASE (R2)
     return word_count
 
 
