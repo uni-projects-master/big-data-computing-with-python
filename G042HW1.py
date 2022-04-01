@@ -1,10 +1,12 @@
 from pyspark import SparkContext, SparkConf
-from pyspark.sql import DataFrameReader
 import sys
 import os
 import random as rand
 
-def format_and_filter_dataset(dataset, S, K=1):
+conf = SparkConf().setAppName('HomeWork1').setMaster("local[*]")
+sc = SparkContext(conf=conf)
+
+def format_partition(dataset, S, K=1):
     product_costumer = set()
     for string in dataset:
         fields = string.split(',')
@@ -16,12 +18,9 @@ def format_and_filter_dataset(dataset, S, K=1):
             product_costumer.add((product,costumer))
     return [((product,costumer),0) for (product,costumer) in product_costumer]
 
-def remove_copies(pairs):
-    return (pairs[0][0],pairs[0][1])
-
-def filter(dataset,K,S):
+def format_and_filter_dataset(dataset,K,S):
     filtered_dataset = dataset\
-        .mapPartitions(lambda x: format_and_filter_dataset(x, S, K))\
+        .mapPartitions(lambda x: format_partition(x, S, K))\
         .groupByKey()\
         .keys()
     return filtered_dataset
@@ -71,35 +70,22 @@ def popularity2(product_costumer, K=1):
         .reduceByKey(lambda x, y: x + y)  # <-- REDUCE PHASE (R2)
     return product_popularity2
 
-def extract_top_H(partition,H):
-    top_H_pairs = set()
-    for i in range(max(H, len(partition))):
-        temp_n = 0
-        temp_p = None
-        for (n,p) in partition:
-            if ((n,p) not in top_H_pairs) and n > temp_n:
-                temp_n = n
-                temp_p = p
-        top_H_pairs.add((temp_n,temp_p))
-    return [(n,p) for (n,p) in top_H_pairs]
+def top(partition, H):
+    top_H_pairs = sc.parallelize(partition)
+    return [x for x in top_H_pairs]
 
 def topH(product_popularity, H, K=1):
-    top_H_product = product_popularity\
-        .map(lambda (p,n): (n,p))\
-        .repartition(numPartitions=K)\
-        .mapPartitions(lambda x: extract_top_H(x,H))
-        .repartition(numPartitions=1)
-        .map(lambda x: extract_top_H(x, H))
-    return product_popularity2
+    partitioned_top_H = product_popularity.top(H, key= lambda x:x[1])
+    return partitioned_top_H
+
+def print_in_lex_order(product_popularity):
+    return product_popularity.sortByKey()
 
 def main():
     # CHECKING NUMBER OF CMD LINE PARAMETERS
     assert len(sys.argv) == 5, "Usage: python G042HW1.py <K> <H> <S> <file_name>"
 
     # SPARK SETUP
-    conf = SparkConf().setAppName('HomeWork1').setMaster("local[*]")
-    sc = SparkContext(conf=conf)
-
     # INPUT READING
 
     # 1. Read number of partitions
@@ -120,18 +106,30 @@ def main():
     assert os.path.isfile(data_path), "File or folder not found"
     #rawData = DataFrameReader.csv(DataFrameReader,data_path)
 
+    #1) loading and partitioning the dataset
     rawData = sc.textFile(data_path, minPartitions=K).cache()
     rawData.repartition(numPartitions=K)
-    # SETTING GLOBAL VARIABLES
-    numdocs = rawData.getNumPartitions();
-    print("Number of documents = ", numdocs)
-    filteredRDD = filter(rawData,K,S)
-    print("filtered stuff =", filteredRDD.collect())
-    product_popularity1 = popularity1(filteredRDD,K)
-    print("product popularity =", product_popularity1.collect())
-    product_popularity2 = popularity2(filteredRDD,K)
-    print("product popularity2 =", product_popularity2.collect())
-    topH(product_popularity1,H,K)
+    print("number of transactions =", rawData.count())
+
+    #2) filtering and converting the rawData to Product-Costumer pairs
+    product_costumer = format_and_filter_dataset(rawData,K,S)
+    print("number of product costumer =", product_costumer.count())
+
+    #3) computing product popularity using mapByPartition
+    product_popularity1 = popularity1(product_costumer,K)
+
+    #4) computing product popularity using map and reduceByKey
+    product_popularity2 = popularity2(product_costumer,K)
+
+    #5) extrcting the top H most popular items
+    if H > 0:
+        topHValues = topH(product_popularity1,H,K)
+        print("Top =", topHValues)
+
+    #6) printing the product popularity dataset
+    if H == 0:
+        print("product popularity1 =", print_in_lex_order(product_popularity1).collect())
+        print("product popularity2 =", print_in_lex_order(product_popularity2).collect())
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
