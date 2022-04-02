@@ -71,11 +71,29 @@ def popularity2(product_costumer, K=1):
     return product_popularity2
 
 def top(partition, H):
-    top_H_pairs = sc.parallelize(partition)
-    return [x for x in top_H_pairs]
+    top_H_element = set()
+    list_of_element = []
+
+    for x in partition:
+        list_of_element.append(x)
+
+    for i in range(min(len(list_of_element),H)):
+        p = None
+        n = -1
+        for y in list_of_element:
+            t_p = y[0]
+            t_n = y[1]
+            if n < t_n and ((t_p,t_n) not in top_H_element):
+                p = t_p
+                n = t_n
+        top_H_element.add((p,n))
+    return [x for x in top_H_element]
 
 def topH(product_popularity, H, K=1):
-    partitioned_top_H = product_popularity.top(H, key= lambda x:x[1])
+    partitioned_top_H = product_popularity\
+        .repartition(numPartitions=K)\
+        .mapPartitions(lambda x : top(x,H))\
+        .top(H, key= lambda x: x[1])
     return partitioned_top_H
 
 def print_in_lex_order(product_popularity):
