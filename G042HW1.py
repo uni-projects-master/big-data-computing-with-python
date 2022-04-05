@@ -19,10 +19,10 @@ def format_partition(dataset, S, K=1):
     return [((product,costumer),0) for (product,costumer) in product_costumer]
 
 def format_and_filter_dataset(dataset,K,S):
-    filtered_dataset = dataset\
-        .mapPartitions(lambda x: format_partition(x, S, K))\
-        .groupByKey()\
-        .keys()
+    filtered_dataset = (dataset
+        .mapPartitions(lambda x: format_partition(x, S, K)) # <-- MAP PHASE (R1)
+        .groupByKey()                                       # <-- SHUFFLE + GROUPING
+        .keys())                                            # <-- REDUCE PHASE (R1)
     return filtered_dataset
 
 def partial_count(dataset):
@@ -41,36 +41,20 @@ def full_count(pair):
     return (product, sum(count_list))
 
 def popularity1(product_costumer, K=1):
-    product_popularity1 = product_costumer\
-        .repartition(numPartitions=K)\
-        .mapPartitions(partial_count)\
-        .groupByKey()\
-        .mapValues(lambda partial_counts: sum(partial_counts))
+    product_popularity1 = (product_costumer
+        .repartition(numPartitions=K)                           # <-- MAP PHASE (R1)
+        .mapPartitions(partial_count)                           # <-- GROUPING + REDUCE PHASE (R1)
+        .groupByKey()                                           # <-- SHUFFLE + GROUPING
+        .mapValues(lambda partial_counts: sum(partial_counts))) # <-- REDUCE PHASE (R2)
     return product_popularity1
 
-def random_partition(product_costumer_pair, K):
-    return (rand.randint(0, K - 1), product_costumer_pair[0])
-
-def partial_count_2(index_product_pair):
-    product_count2 = {}
-    product_list = index_product_pair[1]
-    for product in product_list:
-        if product not in product_count2.keys():
-            product_count2[product] = 1
-        else:
-            product_count2[product] += 1
-
-    return [(product, product_count2[product]) for product in product_count2.keys()]
-
 def popularity2(product_costumer, K=1):
-    product_popularity2 = product_costumer\
-        .map(lambda x : random_partition(x,K))\
-        .groupByKey()\
-        .flatMap(partial_count_2)\
-        .reduceByKey(lambda x, y: x + y)  # <-- REDUCE PHASE (R2)
+    product_popularity2 = (product_costumer
+        .map(lambda x : (x[0],1))                         # <-- MAP PHASE R1
+        .reduceByKey(lambda x, y: x+y,numPartitions=K))   # <-- REDUCE PHASE R1 + R2, R1 works on partition, R2 works on results of partition
     return product_popularity2
 
-def top(partition, H):
+def top_reduce(partition, H):
     top_H_element = set()
     list_of_element = []
 
@@ -86,14 +70,22 @@ def top(partition, H):
             if n < t_n and ((t_p,t_n) not in top_H_element):
                 p = t_p
                 n = t_n
+        list_of_element.remove((p,n))
         top_H_element.add((p,n))
     return [x for x in top_H_element]
 
+
 def topH(product_popularity, H, K=1):
-    partitioned_top_H = product_popularity\
-        .repartition(numPartitions=K)\
-        .mapPartitions(lambda x : top(x,H))\
-        .top(H, key= lambda x: x[1])
+    partitioned_top_H = (product_popularity
+        .repartition(numPartitions=K)                   #MAP R1
+        .mapPartitions(lambda x : top_reduce(x,H))      #REDUCE R1
+        .top(H, key= lambda x: x[1]))                   #REDUCE R2
+    return partitioned_top_H
+
+def topH2(product_popularity, H, K=1):
+    partitioned_top_H = (product_popularity
+        .map(lambda x: (0,x))
+        .reduceByKey(top_reduce,numPartitions=K))
     return partitioned_top_H
 
 def print_in_lex_order(product_popularity):
@@ -143,11 +135,10 @@ def main():
     if H > 0:
         topHValues = topH(product_popularity1,H,K)
         print("Top =", topHValues)
-
     #6) printing the product popularity dataset
     if H == 0:
-        print("product popularity1 =", print_in_lex_order(product_popularity1).collect())
-        print("product popularity2 =", print_in_lex_order(product_popularity2).collect())
+        print("product popularity1 =", sorted(product_popularity1.collect()))
+        print("product popularity2 =", sorted(product_popularity2.collect()))
 '''
     # STANDARD WORD COUNT with reduceByKey
     print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
