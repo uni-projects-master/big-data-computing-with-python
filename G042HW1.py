@@ -139,25 +139,6 @@ def main():
     if H == 0:
         print("product popularity1 =", sorted(product_popularity1.collect()))
         print("product popularity2 =", sorted(product_popularity2.collect()))
-'''
-    # STANDARD WORD COUNT with reduceByKey
-    print("Number of distinct words in the documents using reduceByKey =", word_count_1(docs).count())
-
-    # IMPROVED WORD COUNT with groupByKey
-    print("Number of distinct words in the documents using groupByKey =", word_count_2(docs, K).count())
-
-    # IMPROVED WORD COUNT with groupBy
-    print("Number of distinct words in the documents using groupBy =", word_count_3(docs, K).count())
-
-    # WORD COUNT with mapPartitions
-    wordcount = word_count_with_partition(docs)
-    numwords = wordcount.count()
-    print("Number of distinct words in the documents using mapPartitions =", numwords)
-
-    # COMPUTE AVERAGE WORD LENGTH
-    average_word_len = wordcount.keys().map(lambda x: len(x)).reduce(lambda x, y: x + y)
-    print("Average word length = ", average_word_len / numwords)
-'''
 
 if __name__ == "__main__":
     main()
