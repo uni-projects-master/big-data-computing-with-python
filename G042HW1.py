@@ -42,7 +42,7 @@ def format_and_filter_dataset(dataset, S):
 
 
 # Part 3
-# partial sum compute the partial count of product_costumer with same product in a partition
+# partial sum computes the partial count of product_costumer with same product in a partition
 def partial_count(dataset):
     product_count = {}
     for (product, costumer) in dataset:
