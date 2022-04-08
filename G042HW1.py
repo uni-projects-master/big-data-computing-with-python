@@ -1,6 +1,12 @@
 from pyspark import SparkContext, SparkConf
-import sys
+import random as rand
+import psutil
 import os
+import sys
+from pyspark.sql import SparkSession
+
+os.environ['PYSPARK_PYTHON'] = sys.executable
+os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
 
 # Part 2
