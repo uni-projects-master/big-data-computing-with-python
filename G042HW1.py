@@ -179,7 +179,7 @@ def main():
             print("Product: ", i[0], " Popularity: ", i[1], end="; ")
 
         print("productPopularity2:")
-        for j in productPopularity1:
+        for j in productPopularity2:
             print("Product: ", j[0], " Popularity: ", j[1], end="; ")
 
 
